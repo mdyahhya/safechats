@@ -289,21 +289,25 @@ input,textarea{font-family:inherit;outline:none;border:none;}
 .messages-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
 /* Message bubble */
-.msg-row{display:flex;align-items:flex-end;gap:6px;}
+.msg-row{width:100%; display:flex; margin-bottom:2px;}
 .msg-row.out{justify-content:flex-end;}
 .msg-row.in{justify-content:flex-start;}
+.msg-wrapper{max-width:85%; display:flex; flex-direction:column;}
+.msg-row.out .msg-wrapper{align-items:flex-end;}
+.msg-row.in .msg-wrapper{align-items:flex-start;}
 .bubble{
-  max-width:75%;
-  padding:9px 13px;
+  width:fit-content;
+  padding:10px 14px;
   border-radius:18px;
-  font-size:14px;
-  line-height:1.45;
-  word-break:break-word;
+  font-size:14.5px;
+  line-height:1.4;
+  word-wrap:break-word;
+  white-space:pre-wrap;
   position:relative;
 }
-.msg-row.out .bubble{background:var(--bubble-out);border-bottom-right-radius:5px;color:var(--text);}
-.msg-row.in .bubble{background:var(--bubble-in);border-bottom-left-radius:5px;color:var(--text);}
-.bubble-time{font-size:10.5px;color:var(--text3);margin-top:3px;text-align:right;}
+.msg-row.out .bubble{background:var(--bubble-out);border-bottom-right-radius:4px;color:var(--text);}
+.msg-row.in .bubble{background:var(--bubble-in);border-bottom-left-radius:4px;color:var(--text);}
+.bubble-time{font-size:10px;color:var(--text2);margin-top:4px;opacity:0.8;}
 .msg-sender-name{font-size:11px;color:var(--text2);margin-bottom:2px;font-weight:600;}
 
 /* Message input */
@@ -685,17 +689,33 @@ function openChat(chatId, name, sub, otherUserId, avatar) {
   screen.classList.add('open');
   document.body.style.overflow = 'hidden';
 
+  // Prevent back button from closing app:
+  history.pushState({ chatOpen: true }, '');
+
   loadMessages(chatId);
   subscribeMessages(chatId);
 }
 
-function closeChat() {
+// Global listener for hardware back button
+window.addEventListener('popstate', (e) => {
+  if (activeChatId) {
+    // Close the chat without triggering another history change
+    closeChat(true); 
+  }
+});
+
+function closeChat(fromPopState = false) {
   document.getElementById('chat-screen').classList.remove('open');
   document.body.style.overflow = '';
   activeChatId = null;
   if (msgSubscription) { sb.removeChannel(msgSubscription); msgSubscription = null; }
   const area = document.getElementById('messages-area');
   area.innerHTML = '';
+  
+  // If we closed it via the UI button, remove the history state
+  if (!fromPopState) {
+    history.back();
+  }
 }
 
 // ── MESSAGES ─────────────────────────────────────────────────
@@ -731,7 +751,8 @@ function renderMessages(msgs) {
   let lastDate = '';
 
   msgs.forEach(msg => {
-    const dateStr = new Date(msg.created_at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+    const d = new Date(msg.created_at);
+    const dateStr = d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
     if (dateStr !== lastDate) {
       html += `<div class="date-divider">${dateStr}</div>`;
       lastDate = dateStr;
@@ -740,10 +761,10 @@ function renderMessages(msgs) {
     const isOut = msg.sender_id === currentUser.id;
     html += `
       <div class="msg-row ${isOut ? 'out' : 'in'}">
-        <div>
+        <div class="msg-wrapper">
           <div class="bubble">
             ${escHtml(msg.content)}
-            <div class="bubble-time">${formatDateTime(msg.created_at)}</div>
+            <div class="bubble-time" style="text-align:${isOut?'right':'left'}">${formatDateTime(msg.created_at)}</div>
           </div>
         </div>
       </div>`;
@@ -759,12 +780,17 @@ function subscribeMessages(chatId) {
       filter: `chat_id=eq.${chatId}`
     }, payload => {
       const msg = payload.new;
+      
+      // If we already have this message (e.g. from optimistic UI), skip
+      if (document.getElementById(msg.id)) return;
+
       LS.appendMessage(chatId, msg);
       const area = document.getElementById('messages-area');
       const isOut = msg.sender_id === currentUser.id;
       const bubble = document.createElement('div');
       bubble.className = 'msg-row ' + (isOut ? 'out' : 'in');
-      bubble.innerHTML = `<div><div class="bubble">${escHtml(msg.content)}<div class="bubble-time">${formatDateTime(msg.created_at)}</div></div></div>`;
+      bubble.id = msg.id;
+      bubble.innerHTML = `<div class="msg-wrapper"><div class="bubble">${escHtml(msg.content)}<div class="bubble-time" style="text-align:${isOut?'right':'left'}">${formatDateTime(msg.created_at)}</div></div></div>`;
       area.appendChild(bubble);
       scrollBottom();
     })
@@ -775,16 +801,41 @@ async function sendMessage() {
   const input = document.getElementById('msg-input');
   const content = input.value.trim();
   if (!content || !activeChatId) return;
+  
   input.value = '';
   input.style.height = 'auto';
 
-  const { error } = await sb.from('messages').insert({
+  // Optimistic UI: Append locally immediately
+  const tempMsg = {
+    id: 'temp-' + Date.now(),
+    chat_id: activeChatId,
+    sender_id: currentUser.id,
+    content,
+    created_at: new Date().toISOString()
+  };
+  
+  const area = document.getElementById('messages-area');
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-row out';
+  bubble.id = tempMsg.id;
+  bubble.innerHTML = `<div class="msg-wrapper"><div class="bubble">${escHtml(content)}<div class="bubble-time" style="text-align:right">${formatDateTime(tempMsg.created_at)}</div></div></div>`;
+  area.appendChild(bubble);
+  scrollBottom();
+
+  const { error, data } = await sb.from('messages').insert({
     chat_id: activeChatId,
     sender_id: currentUser.id,
     content
-  });
+  }).select().single();
 
-  if (error) { toast('Failed to send', 'error'); input.value = content; }
+  if (error) {
+    toast('Failed to send', 'error');
+    bubble.style.opacity = '0.5';
+  } else {
+    // Replace temp ID with real one
+    bubble.id = data.id;
+    LS.appendMessage(activeChatId, data);
+  }
 }
 
 function scrollBottom() {
