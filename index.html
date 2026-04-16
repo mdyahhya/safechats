@@ -689,7 +689,9 @@ function openChat(chatId, name, sub, otherUserId, avatar) {
   screen.classList.add('open');
   document.body.style.overflow = 'hidden';
 
-  // Prevent back button from closing app:
+  // FIX: Ensure navbar stays visible or handles transition correctly
+  document.querySelector('.navbar').style.display = 'none';
+
   history.pushState({ chatOpen: true }, '');
 
   loadMessages(chatId);
@@ -707,12 +709,12 @@ window.addEventListener('popstate', (e) => {
 function closeChat(fromPopState = false) {
   document.getElementById('chat-screen').classList.remove('open');
   document.body.style.overflow = '';
+  document.querySelector('.navbar').style.display = 'flex'; // Restore Taskbar
   activeChatId = null;
   if (msgSubscription) { sb.removeChannel(msgSubscription); msgSubscription = null; }
   const area = document.getElementById('messages-area');
   area.innerHTML = '';
   
-  // If we closed it via the UI button, remove the history state
   if (!fromPopState) {
     history.back();
   }
@@ -785,6 +787,10 @@ function subscribeMessages(chatId) {
       if (document.getElementById(msg.id)) return;
 
       LS.appendMessage(chatId, msg);
+      
+      // Update chat list preview immediately
+      loadChats();
+
       const area = document.getElementById('messages-area');
       const isOut = msg.sender_id === currentUser.id;
       const bubble = document.createElement('div');
@@ -794,7 +800,9 @@ function subscribeMessages(chatId) {
       area.appendChild(bubble);
       scrollBottom();
     })
-    .subscribe();
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') console.warn('Subscription Fail:', status);
+    });
 }
 
 async function sendMessage() {
