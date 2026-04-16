@@ -1,9 +1,16 @@
-// netlify/functions/notify.js
 const webpush = require('web-push');
 const { createClient } = require('@supabase/supabase-js');
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  // ── FIX: Handle CORS for Browser Calls ──────────────────────
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers };
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers };
 
   try {
     const { record } = JSON.parse(event.body);
@@ -16,7 +23,7 @@ exports.handler = async (event) => {
       .eq('chat_id', record.chat_id)
       .neq('user_id', record.sender_id);
 
-    if (!recipients || recipients.length === 0) return { statusCode: 200, body: 'No recipients' };
+    if (!recipients || recipients.length === 0) return { statusCode: 200, headers, body: 'No recipients' };
 
     // 2. Get subscriptions
     const recipientIds = recipients.map(r => r.user_id);
@@ -25,7 +32,7 @@ exports.handler = async (event) => {
       .select('*')
       .in('user_id', recipientIds);
 
-    if (!subs || subs.length === 0) return { statusCode: 200, body: 'No subs' };
+    if (!subs || subs.length === 0) return { statusCode: 200, headers, body: 'No subs' };
 
     // 3. Web Push Config
     webpush.setVapidDetails(
@@ -48,8 +55,8 @@ exports.handler = async (event) => {
     );
 
     await Promise.all(promises);
-    return { statusCode: 200, body: JSON.stringify({ sent: true }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true }) };
   } catch (err) {
-    return { statusCode: 500, body: err.message };
+    return { statusCode: 500, headers, body: err.message };
   }
 };
