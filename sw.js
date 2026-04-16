@@ -75,23 +75,23 @@ self.addEventListener('message', event => {
 
 // ── PUSH NOTIFICATION ────────────────────────────────────────
 self.addEventListener('push', event => {
-  let data = { title: 'Safe Chats', body: 'New message', chatId: null, senderName: '' };
+  let data = { title: 'SafeChat', body: 'New message', chatId: null };
 
-  try {
-    if (event.data) data = { ...data, ...event.data.json() };
-  } catch {}
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch {
+      data.body = event.data.text();
+    }
+  }
 
   const options = {
     body: data.body,
     icon: '/safechat.jpg',
     badge: '/safechat.jpg',
-    tag: data.chatId || 'safe-chats-notif',
+    tag: data.chatId || 'safechat-notif',
     renotify: true,
     data: { chatId: data.chatId, url: data.chatId ? '/?chat=' + data.chatId : '/' },
-    actions: [
-      { action: 'open', title: 'Open' },
-      { action: 'dismiss', title: 'Dismiss' }
-    ],
     vibrate: [200, 100, 200]
   };
 
