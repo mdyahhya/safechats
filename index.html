@@ -6,8 +6,8 @@
 <title>Safe Chats – Chats</title>
 <meta name="theme-color" content="#0a0a0a"/>
 <link rel="manifest" href="manifest.json"/>
-<link rel="icon" href="icon-192.png"/>
-<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="icon" href="safechat.jpg"/>
+<link rel="apple-touch-icon" href="safechat.jpg"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -629,14 +629,18 @@ async function searchUser(q, container) {
     return;
   }
 
-  container.innerHTML = users.map(u => `
-    <div class="search-result-item" onclick="startChat('${u.id}','${u.name}','${u.username}','${u.avatar || ''}')">
-      ${renderAvatar(u.name, u.avatar, 40)}
-      <div class="sri-info">
-        <div class="sri-name">${u.name}</div>
-        <div class="sri-username">@${u.username}</div>
-      </div>
-    </div>`).join('');
+  container.innerHTML = users.map(u => {
+    const escapedName = u.name.replace(/'/g, "\\'");
+    const escapedUser = u.username.replace(/'/g, "\\'");
+    return `
+      <div class="search-result-item" onclick="startChat('${u.id}','${escapedName}','${escapedUser}','${u.avatar || ''}')">
+        ${renderAvatar(u.name, u.avatar, 40)}
+        <div class="sri-info">
+          <div class="sri-name">${u.name}</div>
+          <div class="sri-username">@${u.username}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 async function startChat(otherUserId, name, username, avatar) {
