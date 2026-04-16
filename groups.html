@@ -93,13 +93,25 @@ input,textarea{font-family:inherit;outline:none;border:none;}
 .messages-area{flex:1;overflow-y:auto;padding:14px 14px 10px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch;}
 .messages-area::-webkit-scrollbar{width:3px;}
 .messages-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-.msg-row{display:flex;align-items:flex-end;gap:6px;}
+.msg-row{width:100%; display:flex; margin-bottom:2px;}
 .msg-row.out{justify-content:flex-end;}
 .msg-row.in{justify-content:flex-start;}
-.bubble{max-width:75%;padding:9px 13px;border-radius:18px;font-size:14px;line-height:1.45;word-break:break-word;}
-.msg-row.out .bubble{background:#1c1c1c;border-bottom-right-radius:5px;color:var(--text);}
-.msg-row.in .bubble{background:#222;border-bottom-left-radius:5px;color:var(--text);}
-.bubble-time{font-size:10.5px;color:var(--text3);margin-top:3px;text-align:right;}
+.msg-wrapper{max-width:85%; display:flex; flex-direction:column;}
+.msg-row.out .msg-wrapper{align-items:flex-end;}
+.msg-row.in .msg-wrapper{align-items:flex-start;}
+.bubble{
+  width:fit-content;
+  padding:10px 14px;
+  border-radius:18px;
+  font-size:14.5px;
+  line-height:1.4;
+  word-wrap:break-word;
+  white-space:pre-wrap;
+  position:relative;
+}
+.msg-row.out .bubble{background:#1c1c1c;border-bottom-right-radius:4px;color:var(--text);}
+.msg-row.in .bubble{background:#222;border-bottom-left-radius:4px;color:var(--text);}
+.bubble-time{font-size:10px;color:var(--text2);margin-top:4px;opacity:0.8;}
 .msg-sender-name{font-size:11px;color:var(--text2);margin-bottom:2px;font-weight:600;}
 .msg-input-row{display:flex;align-items:flex-end;gap:10px;padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom));background:var(--bg);}
 .msg-input-wrap{flex:1;background:var(--bg3);border-radius:22px;padding:10px 16px;display:flex;align-items:flex-end;}
@@ -427,15 +439,23 @@ function openGroupChat(chatId, name, sub, avatar) {
   document.getElementById('chat-header-sub').textContent = sub;
   document.getElementById('chat-header-avatar').innerHTML = renderAvatar(name, avatar, 36);
   document.getElementById('chat-screen').classList.add('open');
+  
+  history.pushState({ chatOpen: true }, '');
+
   loadMessages(chatId);
   subscribeMessages(chatId);
 }
 
-function closeChat() {
+window.addEventListener('popstate', (e) => {
+  if (activeChatId) closeChat(true);
+});
+
+function closeChat(fromPopState = false) {
   document.getElementById('chat-screen').classList.remove('open');
   activeChatId = null;
   if (msgSubscription) { sb.removeChannel(msgSubscription); msgSubscription = null; }
   document.getElementById('messages-area').innerHTML = '';
+  if (!fromPopState) history.back();
 }
 
 async function loadMessages(chatId) {
@@ -461,12 +481,13 @@ function renderMessages(msgs) {
   let html = '';
   let lastDate = '';
   msgs.forEach(msg => {
-    const dateStr = new Date(msg.created_at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+    const d = new Date(msg.created_at);
+    const dateStr = d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
     if (dateStr !== lastDate) { html += `<div class="date-divider">${dateStr}</div>`; lastDate = dateStr; }
     const isOut = msg.sender_id === currentUser.id;
     const senderName = !isOut ? `<div class="msg-sender-name">${msg.users?.name || 'Unknown'}</div>` : '';
     html += `<div class="msg-row ${isOut ? 'out' : 'in'}">
-      <div>${senderName}<div class="bubble">${escHtml(msg.content)}<div class="bubble-time">${formatDateTime(msg.created_at)}</div></div></div>
+      <div class="msg-wrapper">${senderName}<div class="bubble">${escHtml(msg.content)}<div class="bubble-time" style="text-align:${isOut?'right':'left'}">${formatDateTime(msg.created_at)}</div></div></div>
     </div>`;
   });
   return html;
@@ -477,12 +498,16 @@ function subscribeMessages(chatId) {
   msgSubscription = sb.channel('grp-msgs-' + chatId)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, payload => {
       const msg = payload.new;
+      if (document.getElementById(msg.id)) return;
+
       LS.appendMessage(chatId, msg);
       const area = document.getElementById('messages-area');
       const isOut = msg.sender_id === currentUser.id;
       const div = document.createElement('div');
       div.className = 'msg-row ' + (isOut ? 'out' : 'in');
-      div.innerHTML = `<div><div class="bubble">${escHtml(msg.content)}<div class="bubble-time">${formatDateTime(msg.created_at)}</div></div></div>`;
+      div.id = msg.id;
+      const senderName = !isOut ? `<div class="msg-sender-name">Someone</div>` : ''; 
+      div.innerHTML = `<div class="msg-wrapper">${senderName}<div class="bubble">${escHtml(msg.content)}<div class="bubble-time" style="text-align:${isOut?'right':'left'}">${formatDateTime(msg.created_at)}</div></div></div>`;
       area.appendChild(div);
       scrollBottom();
     }).subscribe();
@@ -494,8 +519,18 @@ async function sendMessage() {
   if (!content || !activeChatId) return;
   input.value = '';
   input.style.height = 'auto';
-  const { error } = await sb.from('messages').insert({ chat_id: activeChatId, sender_id: currentUser.id, content });
-  if (error) { toast('Failed to send', 'error'); input.value = content; }
+
+  // Optimistic
+  const area = document.getElementById('messages-area');
+  const div = document.createElement('div');
+  div.className = 'msg-row out';
+  div.innerHTML = `<div class="msg-wrapper"><div class="bubble">${escHtml(content)}<div class="bubble-time" style="text-align:right">${formatDateTime(new Date())}</div></div></div>`;
+  area.appendChild(div);
+  scrollBottom();
+
+  const { error, data } = await sb.from('messages').insert({ chat_id: activeChatId, sender_id: currentUser.id, content }).select().single();
+  if (error) { toast('Failed to send', 'error'); div.style.opacity = '0.5'; }
+  else { div.id = data.id; LS.appendMessage(activeChatId, data); }
 }
 
 function scrollBottom() {
