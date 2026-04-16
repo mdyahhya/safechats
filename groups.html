@@ -453,7 +453,16 @@ window.addEventListener('popstate', (e) => {
 
 function closeChat(fromPopState = false) {
   document.getElementById('chat-screen').classList.remove('open');
-  document.querySelector('.navbar').style.display = 'flex'; // Restore Taskbar
+  
+  // FORCE RESTORE TASKBAR
+  const nav = document.querySelector('.navbar');
+  if (nav) {
+    nav.style.display = 'flex';
+    nav.style.visibility = 'visible';
+    nav.style.opacity = '1';
+    nav.style.pointerEvents = 'auto';
+  }
+
   activeChatId = null;
   if (msgSubscription) { sb.removeChannel(msgSubscription); msgSubscription = null; }
   document.getElementById('messages-area').innerHTML = '';
@@ -532,7 +541,31 @@ async function sendMessage() {
 
   const { error, data } = await sb.from('messages').insert({ chat_id: activeChatId, sender_id: currentUser.id, content }).select().single();
   if (error) { toast('Failed to send', 'error'); div.style.opacity = '0.5'; }
-  else { div.id = data.id; LS.appendMessage(activeChatId, data); }
+  else { 
+    div.id = data.id; 
+    LS.appendMessage(activeChatId, data);
+    // Ping Netlify for notification
+    triggerPushNotification(activeChatId, content);
+  }
+}
+
+async function triggerPushNotification(chatId, content) {
+  try {
+    const netlifyUrl = 'https://your-site-name.netlify.app/.netlify/functions/notify';
+    fetch(netlifyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        record: {
+          chat_id: chatId,
+          sender_id: currentUser.id,
+          content: content
+        }
+      })
+    });
+  } catch (e) {
+    console.error('Push Fail:', e);
+  }
 }
 
 function scrollBottom() {
