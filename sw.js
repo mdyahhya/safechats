@@ -11,8 +11,7 @@ const CACHE_NAME = 'safe-chats-' + SW_VERSION;
 // App code is NEVER cached — always fetched fresh
 const SHELL_CACHE = [
   '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/safechat.jpg'
 ];
 
 // ── INSTALL ──────────────────────────────────────────────────
@@ -84,8 +83,8 @@ self.addEventListener('push', event => {
 
   const options = {
     body: data.body,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/safechat.jpg',
+    badge: '/safechat.jpg',
     tag: data.chatId || 'safe-chats-notif',
     renotify: true,
     data: { chatId: data.chatId, url: data.chatId ? '/?chat=' + data.chatId : '/' },
