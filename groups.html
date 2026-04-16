@@ -6,8 +6,8 @@
 <title>Safe Chats – Groups</title>
 <meta name="theme-color" content="#0a0a0a"/>
 <link rel="manifest" href="manifest.json"/>
-<link rel="icon" href="icon-192.png"/>
-<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="icon" href="safechat.jpg"/>
+<link rel="apple-touch-icon" href="safechat.jpg"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -342,14 +342,18 @@ async function searchMemberUser(q) {
   const res = document.getElementById('grp-search-results');
   const { data: users } = await sb.from('users').select('*').ilike('username', `%${q}%`).neq('id', currentUser.id).limit(5);
   if (!users || users.length === 0) { res.innerHTML = '<p style="font-size:13px;color:var(--text2);padding:6px 0;">Not found</p>'; return; }
-  res.innerHTML = users.map(u => `
-    <div class="search-result-item" onclick="addMember('${u.id}','${u.name}','${u.username}')">
-      ${renderAvatar(u.name, u.avatar, 36)}
-      <div class="sri-info">
-        <div class="sri-name">${u.name}</div>
-        <div class="sri-username">@${u.username}</div>
-      </div>
-    </div>`).join('');
+  res.innerHTML = users.map(u => {
+    const escapedName = u.name.replace(/'/g, "\\'");
+    const escapedUser = u.username.replace(/'/g, "\\'");
+    return `
+      <div class="search-result-item" onclick="addMember('${u.id}','${escapedName}','${escapedUser}')">
+        ${renderAvatar(u.name, u.avatar, 36)}
+        <div class="sri-info">
+          <div class="sri-name">${u.name}</div>
+          <div class="sri-username">@${u.username}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 function addMember(id, name, username) {
