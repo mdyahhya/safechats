@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Safe Chats – Groups</title>
+<meta name="theme-color" content="#0a0a0a"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="icon-192.png"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0a0a0a;--bg2:#131313;--bg3:#1a1a1a;
+  --border:#242424;--text:#f0f0f0;--text2:#888;--text3:#555;
+  --accent:#fff;--radius:14px;--nav-h:62px;--header-h:58px;
+}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:15px;-webkit-font-smoothing:antialiased;}
+button{font-family:inherit;cursor:pointer;border:none;outline:none;background:none;}
+input,textarea{font-family:inherit;outline:none;border:none;}
+
+#app{display:flex;flex-direction:column;height:100dvh;max-width:520px;margin:0 auto;background:var(--bg);}
+
+.sc-header{height:var(--header-h);display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;}
+.sc-header h1{font-size:19px;font-weight:700;letter-spacing:-0.3px;}
+.icon-btn{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.15s;color:var(--text);}
+.icon-btn:hover,.icon-btn:active{background:var(--bg3);}
+.icon-btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+.scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+.scroll-area::-webkit-scrollbar{width:3px;}
+.scroll-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+.chat-list{display:flex;flex-direction:column;}
+.chat-item{display:flex;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;transition:background 0.12s;border-bottom:1px solid var(--border);}
+.chat-item:active{background:var(--bg2);}
+.chat-item:last-child{border-bottom:none;}
+.chat-info{flex:1;min-width:0;}
+.chat-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.chat-name{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-time{font-size:11.5px;color:var(--text2);flex-shrink:0;margin-left:8px;}
+.chat-preview{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.fab{position:absolute;bottom:calc(var(--nav-h) + 16px);right:18px;width:52px;height:52px;border-radius:50%;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(255,255,255,0.15);transition:transform 0.15s;z-index:20;}
+.fab:active{transform:scale(0.94);}
+.fab svg{width:22px;height:22px;fill:none;stroke:#000;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+
+.bottom-nav{height:var(--nav-h);display:flex;align-items:center;background:var(--bg);border-top:1px solid var(--border);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom);}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 0;color:var(--text3);cursor:pointer;transition:color 0.15s;font-size:10.5px;font-weight:500;}
+.nav-item.active{color:var(--text);}
+.nav-item svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:flex-end;backdrop-filter:blur(2px);}
+.overlay.open{display:flex;}
+.modal{background:var(--bg2);border-radius:22px 22px 0 0;width:100%;max-width:520px;margin:0 auto;padding:22px 20px 30px;max-height:85dvh;overflow-y:auto;animation:slideUp 0.22s ease;}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:4px;margin:0 auto 20px;}
+.modal h2{font-size:17px;font-weight:700;margin-bottom:16px;}
+
+.form-group{margin-bottom:14px;}
+.form-label{font-size:12px;color:var(--text2);font-weight:500;margin-bottom:6px;display:block;}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 14px;color:var(--text);font-size:14px;transition:border-color 0.15s;}
+.form-input:focus{border-color:var(--text3);}
+.form-input::placeholder{color:var(--text3);}
+
+.btn-primary{width:100%;padding:13px;border-radius:12px;background:#fff;color:#000;font-weight:700;font-size:15px;transition:opacity 0.15s,transform 0.1s;margin-top:4px;}
+.btn-primary:active{opacity:0.85;transform:scale(0.99);}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+
+.search-box{display:flex;align-items:center;gap:10px;background:var(--bg3);border-radius:12px;padding:10px 14px;margin-bottom:12px;}
+.search-box svg{width:17px;height:17px;fill:none;stroke:var(--text2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;}
+.search-box input{flex:1;background:none;color:var(--text);font-size:14px;}
+.search-box input::placeholder{color:var(--text3);}
+.search-result-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.search-result-item:last-child{border-bottom:none;}
+.sri-info .sri-name{font-weight:600;font-size:14px;}
+.sri-info .sri-username{font-size:12px;color:var(--text2);}
+.member-tag{display:inline-flex;align-items:center;gap:5px;background:var(--bg3);border-radius:8px;padding:5px 10px;font-size:12px;margin:3px;}
+.member-tag button{color:var(--text2);font-size:15px;line-height:1;margin-left:2px;}
+
+/* Group Chat screen */
+#chat-screen{display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;max-width:520px;margin:0 auto;}
+#chat-screen.open{display:flex;}
+.chat-header{height:var(--header-h);display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.chat-header-back{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
+.chat-header-back svg{width:20px;height:20px;fill:none;stroke:var(--text);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+.chat-header-info{flex:1;min-width:0;}
+.chat-header-name{font-weight:700;font-size:15px;}
+.chat-header-sub{font-size:12px;color:var(--text2);}
+.messages-area{flex:1;overflow-y:auto;padding:14px 14px 10px;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch;}
+.messages-area::-webkit-scrollbar{width:3px;}
+.messages-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.msg-row{display:flex;align-items:flex-end;gap:6px;}
+.msg-row.out{justify-content:flex-end;}
+.msg-row.in{justify-content:flex-start;}
+.bubble{max-width:75%;padding:9px 13px;border-radius:18px;font-size:14px;line-height:1.45;word-break:break-word;}
+.msg-row.out .bubble{background:#1c1c1c;border-bottom-right-radius:5px;color:var(--text);}
+.msg-row.in .bubble{background:#222;border-bottom-left-radius:5px;color:var(--text);}
+.bubble-time{font-size:10.5px;color:var(--text3);margin-top:3px;text-align:right;}
+.msg-sender-name{font-size:11px;color:var(--text2);margin-bottom:2px;font-weight:600;}
+.msg-input-row{display:flex;align-items:flex-end;gap:10px;padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom));background:var(--bg);}
+.msg-input-wrap{flex:1;background:var(--bg3);border-radius:22px;padding:10px 16px;display:flex;align-items:flex-end;}
+.msg-input-wrap textarea{flex:1;background:none;color:var(--text);font-size:14.5px;resize:none;max-height:100px;line-height:1.4;overflow-y:auto;}
+.msg-input-wrap textarea::placeholder{color:var(--text3);}
+.send-btn{width:44px;height:44px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.1s;}
+.send-btn:active{transform:scale(0.93);}
+.send-btn svg{width:18px;height:18px;fill:none;stroke:#000;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.date-divider{text-align:center;font-size:11px;color:var(--text3);margin:8px 0;display:flex;align-items:center;gap:8px;}
+.date-divider::before,.date-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--text);border-radius:50%;animation:spin 0.7s linear infinite;margin:40px auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:9999;transition:opacity 0.3s;}
+#loader.hidden{opacity:0;pointer-events:none;}
+#loader .logo-text{font-size:22px;font-weight:700;}
+#loader .logo-sub{font-size:12px;color:var(--text2);}
+
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 30px;text-align:center;gap:10px;}
+.empty-state svg{width:52px;height:52px;stroke:var(--text3);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+.empty-state p{color:var(--text2);font-size:14px;line-height:1.5;}
+.empty-state strong{color:var(--text);font-size:15px;}
+
+@media(min-width:521px){body{background:#050505;}#app{border-left:1px solid var(--border);border-right:1px solid var(--border);}#chat-screen{left:50%;transform:translateX(-50%);border-left:1px solid var(--border);border-right:1px solid var(--border);}}
+</style>
+</head>
+<body>
+<div id="loader">
+  <div class="logo-text">Safe Chats</div>
+  <div class="logo-sub">Privacy First</div>
+  <div class="spinner"></div>
+</div>
+
+<div id="app">
+  <div class="sc-header">
+    <h1>Groups</h1>
+    <div>
+      <button class="icon-btn" id="btn-new-group" title="Create Group">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="scroll-area">
+    <div class="chat-list" id="group-list">
+      <div style="padding:30px 0;text-align:center;"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <button class="fab" id="btn-new-group-fab" title="New Group" style="display:none;">
+    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+
+  <nav class="bottom-nav">
+    <div class="nav-item" onclick="location.href='index.html'">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chats
+    </div>
+    <div class="nav-item active" onclick="location.href='groups.html'">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Groups
+    </div>
+    <div class="nav-item" onclick="location.href='profile.html'">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Profile
+    </div>
+  </nav>
+</div>
+
+<!-- Create Group Modal -->
+<div class="overlay" id="overlay-create-group">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>Create Group</h2>
+    <div class="form-group">
+      <label class="form-label">Group Name</label>
+      <input class="form-input" id="grp-name" placeholder="e.g. Dev Team" maxlength="60"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Group Username <span style="color:var(--text3);">(unique, no spaces)</span></label>
+      <input class="form-input" id="grp-username" placeholder="e.g. dev.team_2024" maxlength="30"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Add Members by Username</label>
+      <div class="search-box">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="grp-member-search" placeholder="Search username..." autocomplete="off"/>
+      </div>
+      <div id="grp-search-results"></div>
+      <div id="grp-members-list" style="margin-top:8px;display:flex;flex-wrap:wrap;"></div>
+    </div>
+    <button class="btn-primary" id="btn-create-group">Create Group</button>
+  </div>
+</div>
+
+<!-- Group Chat Screen -->
+<div id="chat-screen">
+  <div class="chat-header">
+    <button class="chat-header-back" id="btn-back-chat">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div id="chat-header-avatar"></div>
+    <div class="chat-header-info">
+      <div class="chat-header-name" id="chat-header-name">–</div>
+      <div class="chat-header-sub" id="chat-header-sub">–</div>
+    </div>
+  </div>
+  <div class="messages-area" id="messages-area"></div>
+  <div class="msg-input-row">
+    <div class="msg-input-wrap">
+      <textarea id="msg-input" placeholder="Message..." rows="1"></textarea>
+    </div>
+    <button class="send-btn" id="btn-send">
+      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+let currentUser = null;
+let activeChatId = null;
+let msgSubscription = null;
+let selectedMembers = [];
+
+async function init() {
+  currentUser = await requireAuth();
+  if (!currentUser) return;
+  hideLoader();
+  await loadGroups();
+  setupCreateGroupModal();
+}
+
+function hideLoader() {
+  const el = document.getElementById('loader');
+  el.classList.add('hidden');
+  setTimeout(() => el.remove(), 400);
+}
+
+// ── LOAD GROUPS ──────────────────────────────────────────────
+async function loadGroups() {
+  const list = document.getElementById('group-list');
+
+  const { data: memberships } = await sb
+    .from('chat_members')
+    .select('chat_id')
+    .eq('user_id', currentUser.id);
+
+  if (!memberships || memberships.length === 0) {
+    list.innerHTML = renderEmpty(); return;
+  }
+
+  const chatIds = memberships.map(m => m.chat_id);
+
+  const { data: chats } = await sb
+    .from('chats')
+    .select(`*, groups(group_name, group_username, avatar, description)`)
+    .in('id', chatIds)
+    .eq('is_group', true)
+    .order('created_at', { ascending: false });
+
+  if (!chats || chats.length === 0) {
+    list.innerHTML = renderEmpty(); return;
+  }
+
+  const items = await Promise.all(chats.map(async chat => {
+    const { data: msgs } = await sb
+      .from('messages')
+      .select('content, created_at, sender_id, users(name)')
+      .eq('chat_id', chat.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    return { chat, lastMsg: msgs && msgs[0] };
+  }));
+
+  items.sort((a, b) => {
+    const ta = a.lastMsg ? new Date(a.lastMsg.created_at) : new Date(a.chat.created_at);
+    const tb = b.lastMsg ? new Date(b.lastMsg.created_at) : new Date(b.chat.created_at);
+    return tb - ta;
+  });
+
+  list.innerHTML = items.map(({ chat, lastMsg }) => {
+    const g = chat.groups;
+    const name = g ? g.group_name : 'Group';
+    const username = g ? '@' + g.group_username : '';
+    const preview = lastMsg
+      ? (lastMsg.users?.name || 'Someone') + ': ' + lastMsg.content
+      : 'Group created';
+    const time = lastMsg ? formatTime(lastMsg.created_at) : formatTime(chat.created_at);
+    const av = renderAvatar(name, g?.avatar, 46);
+    return `
+      <div class="chat-item" onclick="openGroupChat('${chat.id}','${escHtml(name)}','${username}','${g?.avatar || ''}')">
+        ${av}
+        <div class="chat-info">
+          <div class="chat-top">
+            <span class="chat-name">${escHtml(name)}</span>
+            <span class="chat-time">${time}</span>
+          </div>
+          <div class="chat-preview">${escHtml(preview)}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderEmpty() {
+  return `<div class="empty-state">
+    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <strong>No groups yet</strong>
+    <p>Tap + to create a group</p>
+  </div>`;
+}
+
+// ── CREATE GROUP ─────────────────────────────────────────────
+function setupCreateGroupModal() {
+  const overlay = document.getElementById('overlay-create-group');
+  const openModal = () => {
+    selectedMembers = [];
+    document.getElementById('grp-members-list').innerHTML = '';
+    document.getElementById('grp-search-results').innerHTML = '';
+    document.getElementById('grp-name').value = '';
+    document.getElementById('grp-username').value = '';
+    overlay.classList.add('open');
+  };
+
+  document.getElementById('btn-new-group').onclick = openModal;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+
+  let t;
+  document.getElementById('grp-member-search').addEventListener('input', function() {
+    clearTimeout(t);
+    const q = this.value.trim();
+    if (!q) { document.getElementById('grp-search-results').innerHTML = ''; return; }
+    t = setTimeout(() => searchMemberUser(q), 350);
+  });
+
+  document.getElementById('btn-create-group').onclick = createGroup;
+}
+
+async function searchMemberUser(q) {
+  const res = document.getElementById('grp-search-results');
+  const { data: users } = await sb.from('users').select('*').ilike('username', `%${q}%`).neq('id', currentUser.id).limit(5);
+  if (!users || users.length === 0) { res.innerHTML = '<p style="font-size:13px;color:var(--text2);padding:6px 0;">Not found</p>'; return; }
+  res.innerHTML = users.map(u => `
+    <div class="search-result-item" onclick="addMember('${u.id}','${u.name}','${u.username}')">
+      ${renderAvatar(u.name, u.avatar, 36)}
+      <div class="sri-info">
+        <div class="sri-name">${u.name}</div>
+        <div class="sri-username">@${u.username}</div>
+      </div>
+    </div>`).join('');
+}
+
+function addMember(id, name, username) {
+  if (selectedMembers.find(m => m.id === id)) { toast('Already added'); return; }
+  selectedMembers.push({ id, name, username });
+  document.getElementById('grp-search-results').innerHTML = '';
+  document.getElementById('grp-member-search').value = '';
+  renderSelectedMembers();
+}
+
+function removeMember(id) {
+  selectedMembers = selectedMembers.filter(m => m.id !== id);
+  renderSelectedMembers();
+}
+
+function renderSelectedMembers() {
+  const el = document.getElementById('grp-members-list');
+  el.innerHTML = selectedMembers.map(m => `
+    <span class="member-tag">
+      ${m.name}
+      <button onclick="removeMember('${m.id}')">×</button>
+    </span>`).join('');
+}
+
+async function createGroup() {
+  const name = document.getElementById('grp-name').value.trim();
+  const username = document.getElementById('grp-username').value.trim().toLowerCase();
+  const btn = document.getElementById('btn-create-group');
+
+  if (!name) { toast('Enter group name', 'error'); return; }
+  if (!/^[a-zA-Z0-9._]{3,30}$/.test(username)) { toast('Username: 3-30 chars, letters/numbers/._', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+
+  try {
+    // Create group record
+    const { data: group, error: ge } = await sb.from('groups').insert({
+      group_name: name, group_username: username, created_by: currentUser.id
+    }).select().single();
+
+    if (ge) { toast(ge.message || 'Username taken', 'error'); return; }
+
+    // Create chat
+    const { data: chat, error: ce } = await sb.from('chats').insert({
+      is_group: true, group_id: group.id, created_by: currentUser.id
+    }).select().single();
+
+    if (ce) { toast('Failed to create chat', 'error'); return; }
+
+    // Add members
+    const memberRows = [
+      { chat_id: chat.id, user_id: currentUser.id, role: 'admin' },
+      ...selectedMembers.map(m => ({ chat_id: chat.id, user_id: m.id, role: 'member' }))
+    ];
+    await sb.from('chat_members').insert(memberRows);
+
+    document.getElementById('overlay-create-group').classList.remove('open');
+    toast('Group created!', 'success');
+    await loadGroups();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Group';
+  }
+}
+
+// ── OPEN GROUP CHAT ──────────────────────────────────────────
+function openGroupChat(chatId, name, sub, avatar) {
+  activeChatId = chatId;
+  document.getElementById('chat-header-name').textContent = name;
+  document.getElementById('chat-header-sub').textContent = sub;
+  document.getElementById('chat-header-avatar').innerHTML = renderAvatar(name, avatar, 36);
+  document.getElementById('chat-screen').classList.add('open');
+  loadMessages(chatId);
+  subscribeMessages(chatId);
+}
+
+function closeChat() {
+  document.getElementById('chat-screen').classList.remove('open');
+  activeChatId = null;
+  if (msgSubscription) { sb.removeChannel(msgSubscription); msgSubscription = null; }
+  document.getElementById('messages-area').innerHTML = '';
+}
+
+async function loadMessages(chatId) {
+  const area = document.getElementById('messages-area');
+  const cached = LS.getChatHistory(chatId);
+  if (cached.length > 0) { area.innerHTML = renderMessages(cached); scrollBottom(); }
+  else area.innerHTML = '<div class="spinner"></div>';
+
+  const { data: msgs } = await sb
+    .from('messages')
+    .select('*, users(name, username)')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: true })
+    .limit(80);
+
+  if (!msgs) return;
+  msgs.forEach(m => LS.appendMessage(chatId, m));
+  area.innerHTML = renderMessages(msgs);
+  scrollBottom();
+}
+
+function renderMessages(msgs) {
+  let html = '';
+  let lastDate = '';
+  msgs.forEach(msg => {
+    const dateStr = new Date(msg.created_at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+    if (dateStr !== lastDate) { html += `<div class="date-divider">${dateStr}</div>`; lastDate = dateStr; }
+    const isOut = msg.sender_id === currentUser.id;
+    const senderName = !isOut ? `<div class="msg-sender-name">${msg.users?.name || 'Unknown'}</div>` : '';
+    html += `<div class="msg-row ${isOut ? 'out' : 'in'}">
+      <div>${senderName}<div class="bubble">${escHtml(msg.content)}<div class="bubble-time">${formatDateTime(msg.created_at)}</div></div></div>
+    </div>`;
+  });
+  return html;
+}
+
+function subscribeMessages(chatId) {
+  if (msgSubscription) sb.removeChannel(msgSubscription);
+  msgSubscription = sb.channel('grp-msgs-' + chatId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, payload => {
+      const msg = payload.new;
+      LS.appendMessage(chatId, msg);
+      const area = document.getElementById('messages-area');
+      const isOut = msg.sender_id === currentUser.id;
+      const div = document.createElement('div');
+      div.className = 'msg-row ' + (isOut ? 'out' : 'in');
+      div.innerHTML = `<div><div class="bubble">${escHtml(msg.content)}<div class="bubble-time">${formatDateTime(msg.created_at)}</div></div></div>`;
+      area.appendChild(div);
+      scrollBottom();
+    }).subscribe();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const content = input.value.trim();
+  if (!content || !activeChatId) return;
+  input.value = '';
+  input.style.height = 'auto';
+  const { error } = await sb.from('messages').insert({ chat_id: activeChatId, sender_id: currentUser.id, content });
+  if (error) { toast('Failed to send', 'error'); input.value = content; }
+}
+
+function scrollBottom() {
+  const area = document.getElementById('messages-area');
+  area.scrollTop = area.scrollHeight;
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+});
+document.getElementById('msg-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+document.getElementById('btn-send').onclick = sendMessage;
+document.getElementById('btn-back-chat').onclick = closeChat;
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Safe Chats – Profile</title>
+<meta name="theme-color" content="#0a0a0a"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="icon-192.png"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0a0a0a;--bg2:#131313;--bg3:#1a1a1a;
+  --border:#242424;--text:#f0f0f0;--text2:#888;--text3:#555;
+  --accent:#fff;--radius:14px;--nav-h:62px;--header-h:58px;
+}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:15px;-webkit-font-smoothing:antialiased;}
+button{font-family:inherit;cursor:pointer;border:none;outline:none;background:none;}
+input,textarea{font-family:inherit;outline:none;border:none;}
+
+#app{display:flex;flex-direction:column;height:100dvh;max-width:520px;margin:0 auto;background:var(--bg);}
+
+.sc-header{height:var(--header-h);display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;}
+.sc-header h1{font-size:19px;font-weight:700;letter-spacing:-0.3px;}
+
+.scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 0 20px;}
+.scroll-area::-webkit-scrollbar{width:3px;}
+.scroll-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+.bottom-nav{height:var(--nav-h);display:flex;align-items:center;background:var(--bg);border-top:1px solid var(--border);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom);}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 0;color:var(--text3);cursor:pointer;transition:color 0.15s;font-size:10.5px;font-weight:500;}
+.nav-item.active{color:var(--text);}
+.nav-item svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+/* Profile hero */
+.profile-hero{
+  display:flex;flex-direction:column;align-items:center;
+  padding:28px 20px 20px;
+  border-bottom:1px solid var(--border);
+  position:relative;
+}
+.avatar-wrap{
+  width:80px;height:80px;border-radius:50%;
+  position:relative;margin-bottom:12px;cursor:pointer;
+}
+.avatar-wrap img,.avatar-initials{
+  width:80px;height:80px;border-radius:50%;
+  object-fit:cover;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:28px;color:#fff;
+}
+.avatar-edit-badge{
+  position:absolute;bottom:2px;right:2px;
+  width:24px;height:24px;background:#fff;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+}
+.avatar-edit-badge svg{width:13px;height:13px;fill:none;stroke:#000;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.profile-name{font-size:20px;font-weight:700;margin-bottom:2px;}
+.profile-username{font-size:13px;color:var(--text2);}
+
+/* Sections */
+.section{padding:16px 18px;border-bottom:1px solid var(--border);}
+.section-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;}
+
+/* Form fields */
+.form-group{margin-bottom:12px;}
+.form-label{font-size:12px;color:var(--text2);font-weight:500;margin-bottom:6px;display:block;}
+.form-input{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:12px;padding:12px 14px;color:var(--text);font-size:14px;
+  transition:border-color 0.15s;
+}
+.form-input:focus{border-color:var(--text3);}
+.form-input::placeholder{color:var(--text3);}
+.form-input:disabled{opacity:0.5;}
+.input-note{font-size:11.5px;color:var(--text3);margin-top:5px;}
+
+/* Buttons */
+.btn-primary{
+  width:100%;padding:13px;border-radius:12px;
+  background:#fff;color:#000;font-weight:700;font-size:15px;
+  transition:opacity 0.15s,transform 0.1s;
+}
+.btn-primary:active{opacity:0.85;transform:scale(0.99);}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+
+.btn-outline{
+  width:100%;padding:13px;border-radius:12px;
+  background:transparent;color:var(--text);font-weight:600;font-size:15px;
+  border:1px solid var(--border);
+  transition:background 0.15s;
+}
+.btn-outline:hover{background:var(--bg3);}
+
+.btn-danger{
+  width:100%;padding:13px;border-radius:12px;
+  background:transparent;color:#e53935;font-weight:600;font-size:15px;
+  border:1px solid #3a1010;
+  transition:background 0.15s;
+}
+.btn-danger:hover{background:#1a0a0a;}
+
+/* Notification toggle row */
+.notif-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;
+}
+.notif-row-info{}
+.notif-row-title{font-weight:600;font-size:14px;}
+.notif-row-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.toggle{
+  position:relative;width:48px;height:27px;flex-shrink:0;
+}
+.toggle input{opacity:0;width:0;height:0;position:absolute;}
+.toggle-slider{
+  position:absolute;inset:0;
+  background:var(--bg3);border-radius:27px;cursor:pointer;
+  transition:background 0.2s;border:1px solid var(--border);
+}
+.toggle-slider::before{
+  content:'';position:absolute;
+  width:20px;height:20px;border-radius:50%;
+  background:var(--text3);
+  top:2px;left:2px;
+  transition:transform 0.2s,background 0.2s;
+}
+.toggle input:checked + .toggle-slider{background:#222;border-color:#444;}
+.toggle input:checked + .toggle-slider::before{transform:translateX(21px);background:#fff;}
+
+/* Status badge */
+.status-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;
+  margin-top:6px;
+}
+.status-badge.ok{background:#0a2016;color:#4caf50;}
+.status-badge.warn{background:#1a0f00;color:#ff9800;}
+.status-badge.off{background:var(--bg3);color:var(--text2);}
+
+/* Auth section */
+.auth-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:40px 24px;text-align:center;
+  min-height:100%;
+}
+.auth-logo{font-size:24px;font-weight:700;margin-bottom:4px;}
+.auth-sub{font-size:13px;color:var(--text2);margin-bottom:32px;}
+.auth-tabs{display:flex;background:var(--bg2);border-radius:12px;padding:4px;margin-bottom:24px;width:100%;}
+.auth-tab{
+  flex:1;padding:9px;border-radius:9px;font-size:14px;font-weight:600;
+  color:var(--text2);cursor:pointer;transition:all 0.15s;
+}
+.auth-tab.active{background:var(--bg3);color:var(--text);}
+
+/* PWA install */
+.install-banner{
+  margin:16px 18px 0;
+  background:var(--bg2);border-radius:14px;
+  padding:14px 16px;
+  display:flex;align-items:center;gap:12px;
+  border:1px solid var(--border);
+}
+.install-banner-icon{
+  width:40px;height:40px;border-radius:10px;
+  background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.install-banner-icon svg{width:20px;height:20px;fill:none;stroke:var(--text);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.install-banner-info{flex:1;}
+.install-banner-title{font-weight:600;font-size:13.5px;}
+.install-banner-sub{font-size:12px;color:var(--text2);margin-top:1px;}
+.install-banner-btn{
+  padding:7px 14px;border-radius:9px;
+  background:#fff;color:#000;font-size:12.5px;font-weight:700;
+  flex-shrink:0;
+}
+
+.spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--text);border-radius:50%;animation:spin 0.7s linear infinite;margin:40px auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:9999;transition:opacity 0.3s;}
+#loader.hidden{opacity:0;pointer-events:none;}
+#loader .logo-text{font-size:22px;font-weight:700;}
+#loader .logo-sub{font-size:12px;color:var(--text2);}
+
+.divider{height:1px;background:var(--border);margin:4px 0;}
+
+@media(min-width:521px){body{background:#050505;}#app{border-left:1px solid var(--border);border-right:1px solid var(--border);}}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="logo-text">Safe Chats</div>
+  <div class="logo-sub">Privacy First</div>
+  <div class="spinner"></div>
+</div>
+
+<div id="app">
+  <div class="sc-header">
+    <h1>My Account</h1>
+    <div id="header-edit-btn" style="display:none;">
+      <button onclick="toggleEdit()" id="edit-toggle-btn" style="font-size:13.5px;font-weight:600;color:var(--text);padding:6px 12px;background:var(--bg3);border-radius:10px;">Edit</button>
+    </div>
+  </div>
+
+  <div class="scroll-area" id="main-scroll">
+    <!-- Dynamically rendered -->
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item" onclick="location.href='index.html'">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chats
+    </div>
+    <div class="nav-item" onclick="location.href='groups.html'">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Groups
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Profile
+    </div>
+  </nav>
+</div>
+
+<script src="config.js"></script>
+<script>
+let currentUser = null;
+let isEditing = false;
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  renderInstallBanner();
+});
+
+// ── INIT ────────────────────────────────────────────────────
+async function init() {
+  const session = await getSession();
+
+  if (!session) {
+    hideLoader();
+    renderAuthScreen();
+    return;
+  }
+
+  currentUser = await getCurrentUser();
+  hideLoader();
+
+  if (!currentUser) {
+    renderSetupScreen(session.user.email);
+    return;
+  }
+
+  LS.setUser(currentUser);
+  renderProfileScreen();
+}
+
+function hideLoader() {
+  const el = document.getElementById('loader');
+  el.classList.add('hidden');
+  setTimeout(() => el.remove(), 400);
+}
+
+// ── AUTH SCREEN ──────────────────────────────────────────────
+function renderAuthScreen() {
+  const scroll = document.getElementById('main-scroll');
+  scroll.innerHTML = `
+    <div class="auth-wrap">
+      <div class="auth-logo">Safe Chats</div>
+      <div class="auth-sub">Privacy First · by Yahya Mundewadi</div>
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Sign In</div>
+        <div class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</div>
+      </div>
+      <div style="width:100%;" id="auth-form-wrap">
+        ${renderLoginForm()}
+      </div>
+    </div>`;
+}
+
+function switchAuthTab(tab) {
+  document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+  document.getElementById('auth-form-wrap').innerHTML = tab === 'login' ? renderLoginForm() : renderSignupForm();
+}
+
+function renderLoginForm() {
+  return `
+    <div class="form-group"><input class="form-input" id="auth-email" type="email" placeholder="Email" autocomplete="email"/></div>
+    <div class="form-group"><input class="form-input" id="auth-pass" type="password" placeholder="Password" autocomplete="current-password"/></div>
+    <button class="btn-primary" id="btn-auth-action" onclick="doLogin()">Sign In</button>
+    <p style="font-size:12px;color:var(--text2);margin-top:14px;text-align:center;">Don't have an account? <span style="color:var(--text);cursor:pointer;font-weight:600;" onclick="switchAuthTab('signup')">Sign up</span></p>`;
+}
+
+function renderSignupForm() {
+  return `
+    <div class="form-group"><input class="form-input" id="auth-email" type="email" placeholder="Email" autocomplete="email"/></div>
+    <div class="form-group"><input class="form-input" id="auth-pass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password"/></div>
+    <button class="btn-primary" id="btn-auth-action" onclick="doSignup()">Create Account</button>
+    <p style="font-size:12px;color:var(--text2);margin-top:14px;text-align:center;">Already have an account? <span style="color:var(--text);cursor:pointer;font-weight:600;" onclick="switchAuthTab('login')">Sign in</span></p>`;
+}
+
+async function doLogin() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass = document.getElementById('auth-pass').value;
+  const btn = document.getElementById('btn-auth-action');
+  if (!email || !pass) { toast('Fill all fields', 'error'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { toast(error.message, 'error'); btn.disabled = false; btn.textContent = 'Sign In'; return; }
+  currentUser = await getCurrentUser();
+  if (!currentUser) {
+    const { data: { session } } = await sb.auth.getSession();
+    renderSetupScreen(email);
+  } else {
+    LS.setUser(currentUser);
+    renderProfileScreen();
+  }
+}
+
+async function doSignup() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass = document.getElementById('auth-pass').value;
+  const btn = document.getElementById('btn-auth-action');
+  if (!email || !pass) { toast('Fill all fields', 'error'); return; }
+  if (pass.length < 6) { toast('Password must be at least 6 characters', 'error'); return; }
+  btn.disabled = true; btn.textContent = 'Creating...';
+  const { error } = await sb.auth.signUp({ email, password: pass });
+  if (error) { toast(error.message, 'error'); btn.disabled = false; btn.textContent = 'Create Account'; return; }
+  toast('Account created! Set up your profile.', 'success');
+  renderSetupScreen(email);
+}
+
+// ── PROFILE SETUP ────────────────────────────────────────────
+function renderSetupScreen(email) {
+  document.getElementById('header-edit-btn').style.display = 'none';
+  const scroll = document.getElementById('main-scroll');
+  scroll.innerHTML = `
+    <div style="padding:28px 20px;">
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Set up your profile</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:24px;">Choose a unique username to get started</div>
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" id="setup-name" placeholder="Your full name" maxlength="60"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" id="setup-username" placeholder="e.g. yahya.mundewadi" maxlength="30" oninput="checkUsernameAvail(this.value)"/>
+        <div class="input-note">Letters, numbers, dot (.) and underscore (_) only</div>
+        <div id="username-status" style="margin-top:5px;"></div>
+      </div>
+      <button class="btn-primary" id="btn-setup" onclick="createProfile()">Continue</button>
+    </div>`;
+}
+
+let usernameCheckTimer;
+async function checkUsernameAvail(val) {
+  const status = document.getElementById('username-status');
+  clearTimeout(usernameCheckTimer);
+  if (!val || val.length < 3) { status.innerHTML = ''; return; }
+  if (!/^[a-zA-Z0-9._]{3,30}$/.test(val)) {
+    status.innerHTML = '<span class="status-badge warn">⚠ Invalid format</span>';
+    return;
+  }
+  usernameCheckTimer = setTimeout(async () => {
+    const { data } = await sb.from('users').select('id').eq('username', val).single();
+    if (data) status.innerHTML = '<span class="status-badge warn">✗ Username taken</span>';
+    else status.innerHTML = '<span class="status-badge ok">✓ Available</span>';
+  }, 400);
+}
+
+async function createProfile() {
+  const name = document.getElementById('setup-name').value.trim();
+  const username = document.getElementById('setup-username').value.trim().toLowerCase();
+  const btn = document.getElementById('btn-setup');
+
+  if (!name) { toast('Enter your name', 'error'); return; }
+  if (!/^[a-zA-Z0-9._]{3,30}$/.test(username)) { toast('Invalid username format', 'error'); return; }
+
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  const { data: { session } } = await sb.auth.getSession();
+  const { error } = await sb.from('users').insert({ auth_id: session.user.id, username, name });
+
+  if (error) {
+    toast(error.code === '23505' ? 'Username already taken' : error.message, 'error');
+    btn.disabled = false; btn.textContent = 'Continue';
+    return;
+  }
+
+  currentUser = await getCurrentUser();
+  LS.setUser(currentUser);
+  toast('Profile created!', 'success');
+  renderProfileScreen();
+}
+
+// ── PROFILE SCREEN ───────────────────────────────────────────
+function renderProfileScreen() {
+  document.getElementById('header-edit-btn').style.display = 'block';
+  const scroll = document.getElementById('main-scroll');
+  const u = currentUser;
+  const av = u.avatar
+    ? `<img class="avatar-initials" src="${u.avatar}" alt="${u.name}"/>`
+    : `<div class="avatar-initials" style="background:${avatarColor(u.name)};">${avatarInitials(u.name)}</div>`;
+
+  scroll.innerHTML = `
+    <div class="profile-hero">
+      <div class="avatar-wrap" onclick="if(isEditing)uploadAvatar()">
+        ${av}
+        <div class="avatar-edit-badge" id="avatar-edit-badge" style="display:none;">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+      </div>
+      <div class="profile-name" id="disp-name">${u.name}</div>
+      <div class="profile-username">@${u.username}</div>
+    </div>
+
+    <div id="install-banner-slot"></div>
+
+    <div class="section" id="edit-section" style="display:none;">
+      <div class="section-title">Edit Profile</div>
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" id="edit-name" value="${u.name}" maxlength="60"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" value="@${u.username}" disabled/>
+        <div class="input-note">Username cannot be changed</div>
+      </div>
+      <button class="btn-primary" onclick="saveProfile()">Save Changes</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Notifications</div>
+      <div class="notif-row">
+        <div class="notif-row-info">
+          <div class="notif-row-title">Push Notifications</div>
+          <div class="notif-row-sub">Get notified when new messages arrive</div>
+          <div id="notif-status-badge"></div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="notif-toggle" onchange="toggleNotifications(this.checked)"/>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Privacy</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;">
+        Safe Chats does not store your messages on any third-party servers beyond your Supabase database.
+        No ads. No tracking. Your data stays yours.
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">App</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">
+        Safe Chats v1.0 · Built by <strong style="color:var(--text);">Yahya Mundewadi</strong> · <a href="https://yahya.in" target="_blank" style="color:var(--text);text-decoration:underline;">yahya.in</a>
+      </div>
+      <button class="btn-danger" onclick="doLogout()">Sign Out</button>
+    </div>`;
+
+  updateNotifStatus();
+  renderInstallBanner();
+}
+
+// ── EDIT PROFILE ─────────────────────────────────────────────
+function toggleEdit() {
+  isEditing = !isEditing;
+  const section = document.getElementById('edit-section');
+  const badge = document.getElementById('avatar-edit-badge');
+  const btn = document.getElementById('edit-toggle-btn');
+  if (section) section.style.display = isEditing ? 'block' : 'none';
+  if (badge) badge.style.display = isEditing ? 'flex' : 'none';
+  if (btn) btn.textContent = isEditing ? 'Done' : 'Edit';
+}
+
+async function saveProfile() {
+  const name = document.getElementById('edit-name').value.trim();
+  if (!name) { toast('Name cannot be empty', 'error'); return; }
+  const { error } = await sb.from('users').update({ name }).eq('id', currentUser.id);
+  if (error) { toast('Failed to save', 'error'); return; }
+  currentUser.name = name;
+  LS.setUser(currentUser);
+  document.getElementById('disp-name').textContent = name;
+  toast('Saved!', 'success');
+  toggleEdit();
+}
+
+async function uploadAvatar() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast('Image too large (max 2MB)', 'error'); return; }
+    toast('Uploading...');
+    const ext = file.name.split('.').pop();
+    const path = `avatars/${currentUser.id}.${ext}`;
+    const { error: upErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
+    if (upErr) { toast('Upload failed', 'error'); return; }
+    const { data: { publicUrl } } = sb.storage.from('avatars').getPublicUrl(path);
+    await sb.from('users').update({ avatar: publicUrl }).eq('id', currentUser.id);
+    currentUser.avatar = publicUrl;
+    LS.setUser(currentUser);
+    renderProfileScreen();
+    toast('Avatar updated!', 'success');
+  };
+  input.click();
+}
+
+// ── NOTIFICATIONS ────────────────────────────────────────────
+function updateNotifStatus() {
+  const toggle = document.getElementById('notif-toggle');
+  const badge = document.getElementById('notif-status-badge');
+  if (!toggle || !badge) return;
+
+  if (!('Notification' in window)) {
+    badge.innerHTML = '<span class="status-badge warn">Not supported</span>';
+    if (toggle) toggle.disabled = true;
+    return;
+  }
+
+  const perm = Notification.permission;
+  if (perm === 'granted') {
+    toggle.checked = true;
+    badge.innerHTML = '<span class="status-badge ok">● Enabled</span>';
+  } else if (perm === 'denied') {
+    toggle.checked = false;
+    badge.innerHTML = '<span class="status-badge warn">Blocked — enable in browser settings</span>';
+    toggle.disabled = true;
+  } else {
+    toggle.checked = false;
+    badge.innerHTML = '<span class="status-badge off">Not enabled</span>';
+  }
+}
+
+async function toggleNotifications(enabled) {
+  if (!enabled) return; // Can't revoke programmatically
+
+  if (!('Notification' in window)) { toast('Notifications not supported', 'error'); return; }
+  if (!('serviceWorker' in navigator)) { toast('Service worker not supported', 'error'); return; }
+
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      toast('Notifications blocked. Enable in browser settings.', 'error');
+      document.getElementById('notif-toggle').checked = false;
+      updateNotifStatus();
+      return;
+    }
+
+    // Subscribe to push
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+
+    const subJson = sub.toJSON();
+    await sb.from('push_subscriptions').upsert({
+      user_id: currentUser.id,
+      endpoint: subJson.endpoint,
+      p256dh: subJson.keys.p256dh,
+      auth_key: subJson.keys.auth
+    }, { onConflict: 'user_id,endpoint' });
+
+    toast('Notifications enabled!', 'success');
+    updateNotifStatus();
+  } catch (err) {
+    toast('Failed: ' + err.message, 'error');
+    document.getElementById('notif-toggle').checked = false;
+    updateNotifStatus();
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+}
+
+// ── LOGOUT ───────────────────────────────────────────────────
+async function doLogout() {
+  await sb.auth.signOut();
+  LS.remove('user');
+  renderAuthScreen();
+  document.getElementById('header-edit-btn').style.display = 'none';
+}
+
+// ── PWA INSTALL BANNER ───────────────────────────────────────
+function renderInstallBanner() {
+  const slot = document.getElementById('install-banner-slot');
+  if (!slot) return;
+
+  const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+  if (isInstalled || !deferredInstallPrompt) { slot.innerHTML = ''; return; }
+
+  slot.innerHTML = `
+    <div class="install-banner">
+      <div class="install-banner-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2v13"/><path d="M5 12l7 7 7-7"/><path d="M3 21h18"/></svg>
+      </div>
+      <div class="install-banner-info">
+        <div class="install-banner-title">Install Safe Chats</div>
+        <div class="install-banner-sub">Add to home screen for instant access</div>
+      </div>
+      <button class="install-banner-btn" onclick="installPWA()">Install</button>
+    </div>`;
+}
+
+async function installPWA() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  if (outcome === 'accepted') {
+    deferredInstallPrompt = null;
+    renderInstallBanner();
+    toast('App installed!', 'success');
+  }
+}
+
+// ── UTILS ────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+init();
+</script>
+</body>
+</html>
