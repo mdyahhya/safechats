@@ -489,6 +489,13 @@ async function init() {
   hideLoader();
   await loadChats();
   setupNewChatModal();
+
+  // GLOBAL REALTIME: Update home screen previews instantly
+  sb.channel('global-watcher')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+      loadChats(); 
+    })
+    .subscribe();
 }
 
 function hideLoader() {
@@ -709,7 +716,16 @@ window.addEventListener('popstate', (e) => {
 function closeChat(fromPopState = false) {
   document.getElementById('chat-screen').classList.remove('open');
   document.body.style.overflow = '';
-  document.querySelector('.navbar').style.display = 'flex'; // Restore Taskbar
+  
+  // FORCE RESTORE TASKBAR
+  const nav = document.querySelector('.navbar');
+  if (nav) {
+    nav.style.display = 'flex';
+    nav.style.visibility = 'visible';
+    nav.style.opacity = '1';
+    nav.style.pointerEvents = 'auto';
+  }
+
   activeChatId = null;
   if (msgSubscription) { sb.removeChannel(msgSubscription); msgSubscription = null; }
   const area = document.getElementById('messages-area');
@@ -840,9 +856,31 @@ async function sendMessage() {
     toast('Failed to send', 'error');
     bubble.style.opacity = '0.5';
   } else {
-    // Replace temp ID with real one
     bubble.id = data.id;
     LS.appendMessage(activeChatId, data);
+    // Ping Netlify for notification
+    triggerPushNotification(activeChatId, content);
+  }
+}
+
+async function triggerPushNotification(chatId, content) {
+  try {
+    // REPLACE THIS with your actual Netlify URL
+    const NETLIFY_URL = 'https://your-site.netlify.app/.netlify/functions/notify';
+    
+    fetch(NETLIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        record: {
+          chat_id: chatId,
+          sender_id: currentUser.id,
+          content: content
+        }
+      })
+    });
+  } catch (e) {
+    console.error('Push trigger fail', e);
   }
 }
 
