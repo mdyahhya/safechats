@@ -439,6 +439,7 @@ function openGroupChat(chatId, name, sub, avatar) {
   document.getElementById('chat-header-sub').textContent = sub;
   document.getElementById('chat-header-avatar').innerHTML = renderAvatar(name, avatar, 36);
   document.getElementById('chat-screen').classList.add('open');
+  document.querySelector('.navbar').style.display = 'none'; // Hide Taskbar
   
   history.pushState({ chatOpen: true }, '');
 
@@ -452,6 +453,7 @@ window.addEventListener('popstate', (e) => {
 
 function closeChat(fromPopState = false) {
   document.getElementById('chat-screen').classList.remove('open');
+  document.querySelector('.navbar').style.display = 'flex'; // Restore Taskbar
   activeChatId = null;
   if (msgSubscription) { sb.removeChannel(msgSubscription); msgSubscription = null; }
   document.getElementById('messages-area').innerHTML = '';
